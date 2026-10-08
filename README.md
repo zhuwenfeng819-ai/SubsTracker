@@ -1,193 +1,387 @@
-# SubsTracker - 订阅管理与提醒系统
-
-基于Cloudflare Workers的轻量级订阅管理系统，帮助您轻松跟踪各类订阅服务的到期时间，并通过 Telegram、Webhook 等多渠道发送及时提醒。
-
-![image](https://github.com/user-attachments/assets/22ff1592-7836-4f73-aa13-24e9d43d7064)
-
-## ✨ 功能特色
-
-### 🎯 核心功能
-- **订阅管理**：添加、编辑、删除各类订阅服务
-- **智能提醒**：自定义提前提醒天数，自动续订计算
-- **农历显示**：支持农历日期显示，可控制开关
-- **状态管理**：订阅启用/停用，过期状态自动识别
-- **财务追踪**：记录订阅费用，完整的支付历史和统计分析
-- **手动续订**：灵活的续订管理，支持自定义金额、周期和备注
-- **仪表盘**：可视化展示月度/年度支出，支出趋势和分类统计
-
-### 📱 多渠道通知
-- **Telegram**：支持 Telegram Bot 通知
-- **NotifyX**：集成 NotifyX 推送服务
-- **Webhook 通知**：支持自定义 Webhook 推送
-- **企业微信机器人**：支持企业微信群机器人通知
-- **邮件通知**：基于 Resend 的专业邮件服务
-- **Bark**：支持 iOS Bark 推送
-- **自定义 Webhook**：支持自定义请求格式和模板
-
-### 🌙 农历功能
-- **农历转换**：支持 1900-2100 年农历转换
-- **智能显示**：列表和编辑页面可控制农历显示
-- **通知集成**：通知消息中可包含农历信息
-
-### 🎨 用户体验
-- **响应式设计**：完美适配桌面端和移动端
-- **备注优化**：长备注自动截断，悬停显示完整内容
-- **实时预览**：日期选择时实时显示对应农历
-- **用户偏好**：记住用户的显示偏好设置
+# SubsTracker — 订阅管理与提醒系统
 
-### 💰 财务管理（新增）
-- **订阅金额追踪**：记录每个订阅的费用，支持多币种
-- **智能仪表盘**：
-  - 📊 月度/年度支出统计，环比趋势分析
-  - 💳 活跃订阅数量，月均支出计算
-  - 📅 最近7天支付记录，即将续费提醒
-  - 📈 按类型/分类的支出排行和占比
-- **支付历史管理**：
-  - 📝 完整的支付记录，支持编辑/删除
-  - 🕒 精确显示计费周期（如：2025年1月15日 - 2025年2月15日）
-  - 📊 累计支出和支付次数统计
-  - 🔄 删除支付记录时自动回退订阅周期
-- **高级续订功能**：
-  - 💵 自定义续订金额（适应价格变动）
-  - 📅 选择续订日期（支持回溯记录）
-  - 🔢 批量续订多个周期（如一次续订12个月）
-  - 📝 添加续订备注（记录优惠活动等）
-  - 👁️ 实时预览新的到期日期
-- **数据洞察**：
-  - 自动计算月均支出和年度总支出
-  - 支出趋势对比（月度环比）
-  - 智能分类统计，了解各类服务占比
+基于 **Cloudflare Workers + KV** 的轻量级订阅到期提醒。在网页里管理订阅，到点通过 Telegram / Bark / 企业微信 / ntfy 等 **11 种渠道** 推送，并自带发送与调度日志方便排查。
 
-## 🚀 一键部署
+**适合**：个人自托管、域名/会员/账单到期提醒。  
+**不适合**：多用户协作、复杂企业审批流。
 
-### 点击按钮，一键部署到 CloudFlare Workers,
+---
 
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/wangwangit/SubsTracker)
+## 目录
 
+1. [5 分钟上手](#-5-分钟上手)
+2. [部署](#-部署)
+3. [第一次必做配置](#-第一次必做配置)
+4. [日常怎么用](#-日常怎么用)
+5. [通知到底怎么工作](#-通知到底怎么工作重点必读)
+6. [功能一览](#-功能一览)
+7. [常见问题 FAQ](#-常见问题-faq)
+8. [升级 / 开发 / 第三方 API](#-升级--开发--第三方-api)
+9. [安全提醒](#-安全提醒)
 
-> 适用于新部署的,以前部署过的直接替换js中的内容即可!
+---
 
-## 📋 三步开始使用
+## 🚀 5 分钟上手
 
-### 1️⃣ 一键部署
-Fork仓库,然后点击自己仓库里的部署按钮，等待部署完成,**注意,KV名称修改为 `SUBSCRIPTIONS_KV`**
-![image.png](https://img.wangwangit.com/file/1751942578108_image.png)
+```text
+部署 Worker
+  → 用 admin / password 登录（立刻改密码）
+  → 系统配置：选时区（中国选 Asia/Shanghai）
+  → 系统配置：允许发送的小时（例如只想早上 8 点发就填 08）
+  → 勾选至少一种通知渠道并填好 Token，点「测试」直到成功
+  → 订阅列表：添加订阅（可用默认提醒预设 7/3/1 天 + 当天）
+  → 到点后去「通知历史」看是否发送 / 为何跳过
+```
 
-### 2️⃣ 首次登录
-- 访问部署后的域名
-- 默认用户名：`admin`
-- 默认密码：`password`
+若中途卡住，先看下方 [常见问题 FAQ](#-常见问题-faq)。
 
-### 3️⃣ 开始使用
-1. **修改默认密码**（进入系统配置）
-2. **配置通知渠道**（选择一个或多个）
-3. **添加订阅**，设置提醒
-4. **享受智能提醒**！
+---
 
-## 🔧 通知渠道配置
+## 📦 部署
 
-### Telegram
-- **Bot Token**: 从 [@BotFather](https://t.me/BotFather) 获取
-- **Chat ID**: 从 [@userinfobot](https://t.me/userinfobot) 获取
+### 方式一：命令行（推荐）
 
-### NotifyX
-- **API Key**: 从 [NotifyX官网](https://www.notifyx.cn/) 获取
+```bash
+git clone https://github.com/wangwangit/SubsTracker.git
+cd SubsTracker
+npm install
 
-### 企业微信机器人
-- **推送 URL**: 参考[官方文档](https://developer.work.weixin.qq.com/document/path/91770)获取
+# Linux / macOS
+export CLOUDFLARE_API_TOKEN=你的token
+# Windows PowerShell
+# $env:CLOUDFLARE_API_TOKEN="你的token"
 
-### Webhook 通知
-- **推送 URL**: 根据所使用的 Webhook 服务或自建接口填写，例如 `https://your-service.com/hooks/notify`
-- 支持自定义请求方法、请求头与消息模板
-- **模板占位符**：`{{title}}`、`{{content}}`、`{{tags}}`（多行形式）、`{{tagsLine}}`、`{{timestamp}}`、`{{formattedMessage}}`
+npm run deploy:safe
+```
 
-### Bark（iOS 推送）
-- **服务器地址**：默认 `https://api.day.app`，也可使用自建服务器
-- **设备 Key**：在 Bark App 内复制
-- **历史记录**：勾选“保存推送”后可保留推送历史
+`deploy:safe` 会：
 
-### 邮件通知 (Resend)
-- **API Key**: 从 [Resend 官方教程](https://developers.cloudflare.com/workers/tutorials/send-emails-with-resend/) 获取
-- **发件人邮箱**: 必须是已在 Resend 验证的域名邮箱
-- **收件人邮箱**: 接收通知的邮箱地址
-- 支持 HTML 格式的美观邮件模板
+1. `npm run setup` — 自动创建 / 绑定 KV（`SUBSCRIPTIONS_KV`）
+2. `npm run deploy` — 部署 Worker
 
-### 🔔 通知时间与时区说明
-- Cloudflare Workers 的 Cron 表达式使用 **UTC 时区**，例如 `0 8 * * *` 表示 UTC 08:00 触发
-- 若希望在北京时间（UTC+8）早上 8 点提醒，可将 Cron 设置为 `0 0 * * *`
-- 若需要小时级提醒，可将 Cron 调整为 `0 * * * *`（每小时执行一次），并在系统配置中指定允许的通知小时
-- 系统配置中的 “系统时区” 用于计算订阅剩余时间和格式化展示，建议与提醒需求保持一致
+部署成功后，终端会打印类似：
 
-### 🔐 第三方 API 安全调用
-- 通过 `POST /api/notify/{token}` 可触发系统通知，请在后台配置“第三方 API 访问令牌”
-- 令牌也可通过 `Authorization: Bearer <token>` 或 `?token=<token>` 传入
-- 未配置或令牌不匹配时接口会直接拒绝请求，建议定期更换随机令牌
+`https://subscription-manager.<你的子域>.workers.dev`
 
+### 方式二：GitHub Actions
 
-> 💡 **提示**: 系统默认每天早上8点自动检查即将到期的订阅
+1. Fork 本仓库  
+2. 仓库 **Settings → Secrets and variables → Actions** 增加：
 
+| Secret | 说明 |
+|--------|------|
+| `CLOUDFLARE_API_TOKEN` | 需 Workers 编辑 + KV 编辑权限 |
+| `CLOUDFLARE_ACCOUNT_ID` | 可选 |
 
-**欢迎大家关注我的公众号**
+3. 推送到 `master` / `main` 或手动运行 **Deploy** workflow  
 
-![39d8d5a902fa1eee6cbbbc8a0dcff4b](https://github.com/user-attachments/assets/96bae085-4299-4377-9958-9a3a11294efc)
+### 默认登录
 
+| 项 | 值 |
+|----|-----|
+| 用户名 | `admin` |
+| 密码 | `password` |
 
+**登录后请立刻在「系统配置」修改密码。** 公网暴露默认密码会被接管。
 
-## 🚀 手动部署指南
+### 忘记密码
 
-### 前提条件
+Cloudflare Dashboard → **Workers & Pages → KV** → 打开 `SUBSCRIPTIONS_KV` → 编辑 key `config` 的 JSON，修改 `ADMIN_PASSWORD` 后保存。
 
-- Cloudflare账户
-- Telegram Bot (用于发送通知)
-- 可以直接将代码丢给AI,帮助查漏补缺
+---
 
-### 部署步骤
+## ✅ 第一次必做配置
 
-1.登陆cloudflare,创建worker,粘贴本项目中的js代码,点击部署
+打开 **系统配置**，建议按顺序做完：
 
-![image](https://github.com/user-attachments/assets/ff4ac794-01e1-4916-b226-1f4f604dcbd3)
+### 1. 改密码
 
+管理员用户名 / 密码改成自己的。页面若提示仍是默认 `admin`，请务必处理。
 
-2.创建KV键值 **SUBSCRIPTIONS_KV**
+### 2. 时区
 
-![image](https://github.com/user-attachments/assets/c9ebaf3e-6015-4400-bb0a-1a55fd5e14d2)
+- 中国大陆用户：**`Asia/Shanghai`（北京时间）**
+- 所有「到期还有几天」「几点发通知」都以这里为准
 
+### 3. 允许发送的小时
 
-3.给worker绑定上键值对,以及设置定时执行时间!
+| 你填什么 | 含义 |
+|----------|------|
+| `08` | **仅**北京时间 **8 点那一小时**会发（约 8:00–8:59 的那次整点检查） |
+| `08, 20` | 早上 8 点、晚上 8 点各可能发一次 |
+| **留空** 或 `*` | **每个整点**都可以发 |
 
-![image](https://github.com/user-attachments/assets/25b663b3-8e8e-4386-a499-9b6bf12ead76)
+要点：
 
+- 系统大约 **每小时整点** 检查一次（Cron：`0 * * * *`，按 UTC 触发，但判断用你配置的时区）。
+- 填了 `08`、现在是 19 点：**不会发**。通知历史里出现「不在允许发送的小时」是 **正常跳过**，不是坏了。
+- 配置页下方有实时预览（会显示「当前会发 / 不会发」）。**改完要点保存**，预览才与服务器一致。
 
-4.打开worker提供的域名地址,输入默认账号密码: admin  password (或者admin admin123),可以在代码中查看默认账号密码!
+### 4. 打开至少一种通知渠道
 
-![image](https://github.com/user-attachments/assets/5dac1ce0-43a3-4642-925c-d9cf21076454)
+勾选渠道 → 填 Token / Chat ID 等 → 点 **测试 xxx 通知**，确认手机/群里能收到。
 
+常用渠道简表：
 
-5.前往系统配置,修改账号密码,以及配置tg通知的信息
+| 渠道 | 你需要准备 |
+|------|------------|
+| Telegram | Bot Token + Chat ID；Forum 群可选 Topic ID |
+| Bark | Device Key；自建可填 Server |
+| 企业微信 | 群机器人 Webhook |
+| ntfy | Server（默认 ntfy.sh）+ Topic；可选 Token |
+| WPUSH | API Key；可选 Channel / Topic 编码 |
+| 邮件 | Resend API Key + 收发邮箱 |
+| Webhook | 任意 HTTP 地址 + 可选模板 |
 
-![image](https://github.com/user-attachments/assets/f6db2089-28a1-439d-9de0-412ee4b2807f)
+### 5. 加一条测试订阅
 
+- 到期日设近一点，提醒规则可用 **「应用预设 7/3/1/当天」**
+- 或临时加一条「到期前 0 天 / 到期当天」，并把「允许发送的小时」改成当前小时做联调（测完改回）
 
-6.配置完成可以点击测试通知,查看是否能够正常通知,然后就可以正常添加订阅使用了!
+---
 
-![image](https://github.com/user-attachments/assets/af530379-332c-4482-9e6e-229a9e24775e)
+## 📋 日常怎么用
 
+### 订阅列表
 
-## 赞助
-本项目 CDN 加速及安全防护由 Tencent EdgeOne 赞助：EdgeOne 提供长期有效的免费套餐，包含不限量的流量和请求，覆盖中国大陆节点，且无任何超额收费，感兴趣的朋友可以点击下面的链接领取
+| 操作 | 说明 |
+|------|------|
+| 添加 / 编辑 | 名称、周期、金额、分类、农历等 |
+| **克隆** | 复制一条（名称带「副本」），适合 esim 保号等同构订阅 |
+| 续订 | 手动延长周期并记支付 |
+| 停用 / 启用 | 停用后不再提醒（本地刷新，不必整页重载） |
+| 测试 | 立刻对该订阅发一条测试通知 |
+| 历史 | 支付记录 |
+| 筛选 | 关键词、循环/重置模式、**状态**（正常/即将到期/已过期/已停用）、分类 |
 
-[[Best Asian CDN, Edge, and Secure Solutions - Tencent EdgeOne](https://edgeone.ai/?from=github)]
+### 提醒规则（每条订阅可多条）
 
-[![image](https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png)](https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png)
+默认预设：**到期前 7 天、3 天、1 天 + 到期当天**。
 
-## 🤝 贡献
+**重要语义（很多人误解这里）：**
 
-欢迎贡献代码、报告问题或提出新功能建议!
+> 「到期前 N 天」= **剩余天数正好等于 N 的那一天发一次**  
+> **不会**从第 N 天起每天连发。
 
-## 📜 许可证
+若要 7、6、5… 都提醒，需要多条规则，或使用预设 7/3/1/当天。
 
-MIT License
+其它类型：
 
-## Star History
+- **到期当天**
+- **到期后**：每隔 X 小时提醒，直到你续费（受「允许发送的小时」约束）
 
-[![Star History Chart](https://api.star-history.com/svg?repos=wangwangit/SubsTracker&type=Date)](https://www.star-history.com/#wangwangit/SubsTracker&Date)
+### 订阅模式：循环 vs 到期重置
+
+| 模式 | 一句话 | 例子 |
+|------|--------|------|
+| **循环订阅** | 未过期就从**当前到期日**往后接 | 会员 6/15 到期，6/3 续费 → 新到期约 7/15 |
+| **到期重置** | 从**支付日**重新算一整段周期 | 保号卡充值日重新起算 180 天 |
+
+### 周期快捷
+
+表单里可用 **季度 / 半年 / 一年** 快捷（本质是 3 个月 / 6 个月 / 1 年）。  
+公历可勾选 **「每月最后一天」**（适合「每月月末提醒」；农历下不用这个）。
+
+### 备份与迁移
+
+在 **系统配置** 最下方：
+
+1. **导出备份** → 下载 JSON（默认可不含密钥）
+2. 换账号 / 重装后 **导入**  
+   - **合并**：按订阅 ID 覆盖同名，保留其它  
+   - **覆盖**：先清空再整包导入（危险，先导出当前数据）
+
+升级大版本或迁移 CF 账号前，**先导出一份**。
+
+---
+
+## 🔔 通知到底怎么工作（重点必读）
+
+```text
+每小时整点 Cron
+  → 看现在是否在「允许发送的小时」（按时区）
+  → 看每条启用中的订阅是否命中某条提醒规则（精确日/小时）
+  → 去重（同一天同一规则不重复刷）
+  → 发到你启用的渠道
+  → 写入「通知历史」+「调度日志」
+```
+
+「允许发送的小时」是发送窗口。例如填 `08, 12`，命中同一条日级规则后通常只在 08 点发送一次，12 点不会重复发送；它不是每天发送两次的计划。
+
+| 现象 | 通常原因 |
+|------|----------|
+| 任务历史：不在允许发送的小时 | 当前整点不在你填的 `08` 等列表里 → **正常** |
+| 在窗口内但 sentCount=0 | 今天没有规则被命中（还没到「正好 N 天」） |
+| 有 failed 记录 | 渠道配置错 / Token 失效 / 网络拒绝 → 看错误详情 |
+| 一天只在 8 点附近收到 | 你只配置了 `08`，符合预期 |
+| 希望一天提醒多次 | 把允许小时写成多个，如 `08, 12, 20`，或留空 |
+
+**列表上的「提醒」列**：显示该订阅真实多规则摘要（如 `提前 7/3/1 天 · 到期当天`），与后台 `reminder_rules` 一致。
+
+---
+
+## ✨ 功能一览
+
+### 订阅
+
+- 增删改查、启用/停用、克隆、筛选  
+- 多规则提醒、农历周期、自动/手动续订、支付历史  
+- 季/半年快捷、公历月末选项  
+
+### 通知渠道（10）
+
+Telegram · NotifyX · Webhook · 企业微信 · Resend 邮件 · Bark · Gotify · Server酱 · PushPlus · ntfy · **WPUSH**
+
+### 可观测
+
+- `/admin/notify-logs`：发送成功/失败明细  
+- 调度日志：命中/去重/跳过原因  
+- `/debug`：时区与通知窗口诊断（需登录）  
+
+### 财务
+
+多币种、仪表盘支出统计（依赖支付记录与汇率；汇率接口失败时有兜底）
+
+---
+
+## ❓ 常见问题 FAQ
+
+### 1. 为什么没收到通知？
+
+按顺序查：
+
+1. **系统配置**是否启用了渠道？「测试」能否收到？  
+2. **允许发送的小时**是否包含「现在」？（填了 `08` 则只有 8 点）  
+3. **时区**是否是 `Asia/Shanghai`？  
+4. 该订阅是否 **启用**？提醒规则是否启用？  
+5. 今天是否正好命中「到期前 N 天 / 当天」？  
+6. 打开 **通知历史**：  
+   - 有 failed → 看渠道报错  
+   - 只有跳过、写着不在允许小时 → 等到配置的小时  
+   - 完全没有相关记录 → 可能还没到整点检查，或规则未命中  
+
+### 2. 任务历史写「不在允许发送的小时 / 不在配置时段」？
+
+说明定时任务跑了，但当前小时不允许发。  
+例如只允许 `08`，晚上 19 点跳过 → **正常**。  
+到北京时间 8 点再看是否发送。
+
+### 3. 设置了「到期前 7 天」，为什么第 6～1 天没有通知？
+
+这是 **精确日** 设计：只在剩余 **正好 7 天** 那天发。  
+需要多天提醒请加多条规则，或用预设 **7/3/1/当天**。
+
+### 4. 列表提醒一直显示「提前 7 天」？
+
+当前版本列表会读真实规则摘要。请 **强制刷新**（Ctrl+Shift+R）。  
+若仍不对，打开浏览器开发者工具 → Network → `subscriptions`，看返回里是否有 `reminderRulesSummary`。
+
+### 5. 克隆按钮看不见或没颜色？
+
+操作列有 **克隆**（青色）。强制刷新；按钮在「编辑」后面。  
+若只有灰字，确认已部署含主题样式的最新版本。
+
+### 6. 循环订阅和到期重置有啥区别？
+
+见上文表格：会员续费用 **循环**；按充值日重算周期用 **重置**。
+
+### 7. 如何备份 / 换 Cloudflare 账号？
+
+系统配置 → **导出备份** → 新环境部署后 **导入**。  
+覆盖模式会清空现有订阅，操作前再导出一次当前数据。
+
+### 8. Telegram 如何发到群话题（Topic）？
+
+系统配置 → Telegram → 填写可选 **Topic ID**（对应 `message_thread_id`）。  
+普通私聊/普通群可留空。
+
+### 9. ntfy 怎么配？
+
+启用 ntfy → Server 默认 `https://ntfy.sh` → 填自己的 Topic → 手机 ntfy App 订阅同一 Topic → 点测试。
+
+### 10. WPUSH 怎么配？
+
+启用 WPUSH → 在 [设置页](https://wpush.cn/settings) 获取 API Key → 可选填写渠道 / Topic 编码 → 点测试。成功条件为接口返回 `code === 0`。
+
+### 11. 控制台里 `beacon.min.js` / cloudflareinsights 报错？
+
+那是 **Cloudflare 统计脚本**，不是本项目业务代码。一般可忽略，与订阅列表无关。
+
+### 12. Authentication error [code: 10000]（部署时）
+
+Token 权限不足或 Wrangler 缓存问题：检查 API Token 权限，必要时删 `.wrangler/` 后重试。
+
+### 13. 第三方系统想调通知接口？
+
+在系统配置生成 **第三方 API 令牌** 后：
+
+```bash
+curl -X POST "https://你的域名.workers.dev/api/notify/你的令牌" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"标题","content":"正文"}'
+```
+
+也可用请求头：`Authorization: Bearer 你的令牌`。
+
+---
+
+## 🔄 升级
+
+```bash
+git pull
+npm install
+npm run deploy:safe
+```
+
+首次访问会自动做 KV 结构迁移。升级前建议 **导出备份**。
+
+> 若很久以前按 **UTC** 理解「通知小时」，现在请一律按配置里的 **时区**（如北京时间）理解，并到配置页看预览。
+
+---
+
+## 🛠 开发
+
+```bash
+npm install
+npm test           # 单元 / 集成测试
+npm run lint
+npx wrangler dev --config wrangler.dev.toml --local
+# http://127.0.0.1:8787  默认 admin / password
+```
+
+```text
+src/
+├── index.js           # fetch + scheduled 入口
+├── app.js             # Hono
+├── core/              # 时间、农历、货币、JWT
+├── data/              # KV 与迁移
+├── services/          # 调度器 + 通知渠道
+├── api/               # 路由与 handler
+└── views/             # 管理端 HTML
+public/                # 静态资源（如 api-client.js）
+tests/                 # Vitest + workerd
+```
+
+---
+
+## 🔐 安全提醒
+
+1. **立刻修改** 默认 `admin` / `password`  
+2. 不要把 API Token、Bot Token 提交进 Git  
+3. 备份 JSON 若勾选「包含敏感配置」，请当密码一样保管  
+4. 对话、截图里不要长期暴露 Cloudflare API Token；泄露请到 Dashboard **轮换 Token**
+
+---
+
+## 🤝 贡献与协议
+
+欢迎 Issue / PR。业务逻辑变更请尽量带测试。  
+MIT License。
+
+---
+
+## 关注作者
+
+![image](https://github.com/user-attachments/assets/96bae085-4299-4377-9958-9a3a11294efc)
+
+CDN 加速由 Tencent EdgeOne 赞助。
