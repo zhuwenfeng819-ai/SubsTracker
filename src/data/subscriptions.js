@@ -154,6 +154,7 @@ async function createSubscription(subscription, env) {
     const timezone = config.TIMEZONE || 'Asia/Shanghai';
     const now = getNowInTimezone(timezone);
     const todayMidnight = getTimezoneMidnightTimestamp(now.utc, timezone);
+    const autoRenew = subscription.autoRenew !== false;
     const startDate = parseOptionalDateInTimezone(subscription.startDate, timezone);
     let expiryDate = parseOptionalDateInTimezone(subscription.expiryDate, timezone);
     if (!expiryDate) {
@@ -169,7 +170,7 @@ async function createSubscription(subscription, env) {
         expiryParts.day
       );
 
-      if (lunar && subscription.periodValue && subscription.periodUnit) {
+      if (autoRenew && lunar && subscription.periodValue && subscription.periodUnit) {
         while (getTimezoneMidnightTimestamp(expiryDate, timezone) < todayMidnight) {
           lunar = lunarBiz.addLunarPeriod(lunar, subscription.periodValue, subscription.periodUnit);
           const solar = lunarBiz.lunar2solar(lunar);
@@ -177,7 +178,7 @@ async function createSubscription(subscription, env) {
         }
       }
     } else {
-      if (getTimezoneMidnightTimestamp(expiryDate, timezone) < todayMidnight && subscription.periodValue && subscription.periodUnit) {
+      if (autoRenew && getTimezoneMidnightTimestamp(expiryDate, timezone) < todayMidnight && subscription.periodValue && subscription.periodUnit) {
         while (getTimezoneMidnightTimestamp(expiryDate, timezone) < todayMidnight) {
           const endOfMonth = !!subscription.endOfMonth && !useLunar;
           expiryDate = addCalendarPeriodInTimezone(
@@ -235,7 +236,7 @@ async function createSubscription(subscription, env) {
             ]
           : [],
       isActive: subscription.isActive !== false,
-      autoRenew: subscription.autoRenew !== false,
+      autoRenew,
       useLunar: useLunar,
       createdAt: new Date().toISOString()
     };
@@ -272,6 +273,11 @@ async function updateSubscription(id, subscription, env) {
     const timezone = config.TIMEZONE || 'Asia/Shanghai';
     const now = getNowInTimezone(timezone);
     const todayMidnight = getTimezoneMidnightTimestamp(now.utc, timezone);
+    const autoRenew = subscription.autoRenew !== undefined
+      ? subscription.autoRenew
+      : existing.autoRenew !== undefined
+        ? existing.autoRenew
+        : true;
     const incomingStartDate = parseOptionalDateInTimezone(subscription.startDate, timezone);
     let expiryDate = parseOptionalDateInTimezone(subscription.expiryDate, timezone);
     if (!expiryDate) {
@@ -289,7 +295,7 @@ async function updateSubscription(id, subscription, env) {
       if (!lunar) {
         return { success: false, message: '农历日期超出支持范围（1900-2100年）' };
       }
-      if (lunar && getTimezoneMidnightTimestamp(expiryDate, timezone) < todayMidnight && subscription.periodValue && subscription.periodUnit) {
+      if (autoRenew && lunar && getTimezoneMidnightTimestamp(expiryDate, timezone) < todayMidnight && subscription.periodValue && subscription.periodUnit) {
         do {
           lunar = lunarBiz.addLunarPeriod(lunar, subscription.periodValue, subscription.periodUnit);
           const solar = lunarBiz.lunar2solar(lunar);
@@ -301,7 +307,7 @@ async function updateSubscription(id, subscription, env) {
         subscription.endOfMonth !== undefined
           ? !!subscription.endOfMonth && !useLunar
           : !!existing.endOfMonth && !useLunar;
-      if (getTimezoneMidnightTimestamp(expiryDate, timezone) < todayMidnight && subscription.periodValue && subscription.periodUnit) {
+      if (autoRenew && getTimezoneMidnightTimestamp(expiryDate, timezone) < todayMidnight && subscription.periodValue && subscription.periodUnit) {
         while (getTimezoneMidnightTimestamp(expiryDate, timezone) < todayMidnight) {
           expiryDate = addCalendarPeriodInTimezone(
             expiryDate,
@@ -390,12 +396,7 @@ async function updateSubscription(id, subscription, env) {
         now.utc.toISOString(),
       paymentHistory,
       isActive: subscription.isActive !== undefined ? subscription.isActive : existing.isActive,
-      autoRenew:
-        subscription.autoRenew !== undefined
-          ? subscription.autoRenew
-          : existing.autoRenew !== undefined
-            ? existing.autoRenew
-            : true,
+      autoRenew,
       useLunar: useLunar,
       updatedAt: new Date().toISOString()
     };

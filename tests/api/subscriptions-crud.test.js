@@ -3,7 +3,7 @@
  * 订阅 CRUD 生命周期
  * 覆盖：创建/读取/更新/删除、缺字段、删除清理 reminder_rules、toggle、续订
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 // @ts-ignore
 import { env } from 'cloudflare:test';
 import app from '../../src/app.js';
@@ -38,6 +38,87 @@ async function loginCookie() {
 }
 
 beforeEach(clearKv);
+
+describe('保存过期订阅时的自动续订设置', () => {
+  const expiredDate = '2026-04-01';
+  const expiredIso = '2026-03-31T16:00:00.000Z';
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-24T00:00:00.000Z'));
+  });
+
+  afterEach(() => vi.useRealTimers());
+
+  it.each([false, true])('新建时关闭自动续订应保留过去的到期日（农历=%s）', async (useLunar) => {
+    const cookie = await loginCookie();
+    const res = await app.request('/api/subscriptions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({
+        name: 'Expired', expiryDate: expiredDate, periodValue: 1,
+        periodUnit: 'month', autoRenew: false, useLunar, amount: 10
+      })
+    }, env);
+    expect(res.status).toBe(201);
+    const { subscription } = await res.json();
+    const saved = await subRepo.getById(env, subscription.id);
+    expect(saved.autoRenew).toBe(false);
+    expect(saved.expiryDate).toBe(expiredIso);
+    expect(saved.paymentHistory[0].periodEnd).toBe(expiredIso);
+  });
+
+  it.each([
+    { useLunar: false, autoRenew: false },
+    { useLunar: true, autoRenew: false },
+    { useLunar: false, autoRenew: undefined },
+    { useLunar: true, autoRenew: undefined }
+  ])('编辑时关闭或沿用已关闭的自动续订应保留到期日（%j）', async ({ useLunar, autoRenew }) => {
+    const cookie = await loginCookie();
+    await subRepo.save(env, {
+      id: 'expired', name: 'Expired', expiryDate: expiredIso,
+      autoRenew: autoRenew !== undefined, isActive: true, useLunar, paymentHistory: []
+    });
+    const res = await app.request('/api/subscriptions/expired', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({
+        name: 'Edited', expiryDate: expiredDate, periodValue: 1,
+        periodUnit: 'month', autoRenew, useLunar
+      })
+    }, env);
+    expect(res.status).toBe(200);
+    const saved = await subRepo.getById(env, 'expired');
+    expect(saved.autoRenew).toBe(false);
+    expect(saved.expiryDate).toBe(expiredIso);
+    expect(saved.paymentHistory).toEqual([]);
+  });
+
+  it.each([false, true])('开启自动续订时新建和编辑仍推进过期日期（农历=%s）', async (useLunar) => {
+    const cookie = await loginCookie();
+    const fields = {
+      name: 'Renewing', expiryDate: expiredDate, periodValue: 1,
+      periodUnit: 'month', autoRenew: true, useLunar
+    };
+    const create = await app.request('/api/subscriptions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify(fields)
+    }, env);
+    expect(create.status).toBe(201);
+    const { subscription } = await create.json();
+    expect(new Date(subscription.expiryDate).getTime()).toBeGreaterThan(Date.now());
+    const update = await app.request('/api/subscriptions/' + subscription.id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify(fields)
+    }, env);
+    expect(update.status).toBe(200);
+    const saved = await subRepo.getById(env, subscription.id);
+    expect(saved.autoRenew).toBe(true);
+    expect(new Date(saved.expiryDate).getTime()).toBeGreaterThan(Date.now());
+  });
+});
 
 describe('订阅 CRUD', () => {
   it('创建订阅成功并写入默认提醒规则', async () => {

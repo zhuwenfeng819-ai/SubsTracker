@@ -230,6 +230,27 @@ describe('调度器 - 时区 + 通知时段', () => {
 });
 
 describe('调度器 - 自动续订', () => {
+  it('已过期 + autoRenew=false → 保留到期日和支付历史', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-24T00:00:00.000Z'));
+    await setConfig({
+      JWT_SECRET: 's', TIMEZONE: 'Asia/Shanghai',
+      NOTIFICATION_HOURS: [], ENABLED_NOTIFIERS: []
+    });
+    const subscription = {
+      id: 's-no-renew', name: 'No renew', isActive: true, autoRenew: false,
+      expiryDate: '2026-04-01T00:00:00.000Z', periodValue: 1,
+      periodUnit: 'month', amount: 10, paymentHistory: []
+    };
+    await subRepo.save(env, subscription);
+
+    const log = await checkExpiringSubscriptions(env);
+    expect(log.autoRenewedCount).toBe(0);
+    const saved = await subRepo.getById(env, subscription.id);
+    expect(saved.expiryDate).toBe(subscription.expiryDate);
+    expect(saved.paymentHistory).toEqual([]);
+  });
+
   it('已过期 + autoRenew=true → 推进到期日 + 写 auto 支付记录', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-24T00:00:00.000Z'));
